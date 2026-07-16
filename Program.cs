@@ -43,11 +43,17 @@ builder.Services.AddSingleton<IAmazonSimpleNotificationService>(sp =>
         RegionEndpoint.GetBySystemName(opts.Region));
 });
 
+// Use a fake publisher in Development so no real AWS credentials are needed
+if (builder.Environment.IsDevelopment())
+    builder.Services.AddSingleton<ISnsPublisher, FakeSnsPublisher>();
+else
+    builder.Services.AddSingleton<ISnsPublisher, SnsPublisher>();
+
 builder.Services.AddSingleton<IHostedService>(sp =>
     new OutboxPublisherService(
         sqliteConnectionString,
         sp.GetRequiredService<IOptions<InfrastructureOptions>>(),
-        sp.GetRequiredService<IAmazonSimpleNotificationService>(),
+        sp.GetRequiredService<ISnsPublisher>(),
         sp.GetRequiredService<ILogger<OutboxPublisherService>>()));
 
 builder.Services.AddProblemDetails();

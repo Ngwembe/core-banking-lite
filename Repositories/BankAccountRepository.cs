@@ -55,6 +55,16 @@ namespace core_banking_lite.Repositories
         AND    is_active   = 1
         """;
 
+        // Diagnostic — only executed when the UPDATE returns 0 rows.
+        private const string DiagnoseFailureSql = """
+        SELECT CASE
+                   WHEN NOT EXISTS (SELECT 1 FROM accounts WHERE id = @accountId)           THEN 'NOT_FOUND'
+                   WHEN EXISTS     (SELECT 1 FROM accounts WHERE id = @accountId
+                                    AND is_active = 0)                                      THEN 'INACTIVE'
+                   ELSE                                                                          'INSUFFICIENT_FUNDS'
+               END AS reason
+        """;
+
         private const string InsertOutboxSql = """
         INSERT INTO outbox_messages (id, event_type, payload, created_at, processed)
         VALUES (@id, @eventType, @payload, @createdAt, 0)
@@ -79,8 +89,26 @@ namespace core_banking_lite.Repositories
 
                 if (rows == 0)
                 {
+                    // Classify the failure without reintroducing TOCTOU:
+                    // this read does not gate any write — the transaction is already being abandoned.
+                    string reason = await conn.ExecuteScalarAsync<string>(
+                        new CommandDefinition(
+                            DiagnoseFailureSql,
+                            new { accountId },
+                            transaction: tx,
+                            cancellationToken: ct)) ?? "INSUFFICIENT_FUNDS";
+
                     await tx.RollbackAsync(ct);
-                    return Result<WithdrawalRecord>.Fail("Insufficient funds or account not found.");
+
+                    return reason switch
+                    {
+                        "NOT_FOUND" => Result<WithdrawalRecord>.Fail($"Account {accountId} not found."),
+                        "INACTIVE" => Result<WithdrawalRecord>.Fail($"Account {accountId} is inactive."),
+                        _ => Result<WithdrawalRecord>.Fail("Insufficient funds.")
+                    };
+
+                    //await tx.RollbackAsync(ct);
+                    //return Result<WithdrawalRecord>.Fail("Insufficient funds or account not found.");
                 }
 
                 // Step 2 — Write outbox message in the SAME transaction.

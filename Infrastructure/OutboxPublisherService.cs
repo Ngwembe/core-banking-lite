@@ -1,6 +1,5 @@
-﻿using Amazon.SimpleNotificationService;
-using Amazon.SimpleNotificationService.Model;
-using core_banking_lite.Entities;
+﻿using core_banking_lite.Entities;
+using core_banking_lite.Interfaces;
 using Dapper;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Options;
@@ -10,7 +9,7 @@ namespace core_banking_lite.Infrastructure
     public sealed class OutboxPublisherService(
     string connectionString,
     IOptions<InfrastructureOptions> infraOptions,
-    IAmazonSimpleNotificationService snsClient,
+    ISnsPublisher snsPublisher,
     ILogger<OutboxPublisherService> logger) : BackgroundService
     {
         private readonly InfrastructureOptions _opts = infraOptions.Value;
@@ -61,11 +60,7 @@ namespace core_banking_lite.Infrastructure
             {
                 try
                 {
-                    await snsClient.PublishAsync(new PublishRequest
-                    {
-                        Message = message.Payload,
-                        TopicArn = _opts.SnsTopicArn
-                    }, ct);
+                    await snsPublisher.PublishAsync(_opts.SnsTopicArn, message.Payload, ct);
 
                     // Only mark processed after confirmed SNS delivery
                     await conn.ExecuteAsync(

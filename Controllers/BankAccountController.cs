@@ -1,14 +1,7 @@
-using Amazon;
-using Amazon.Runtime.Internal.Util;
-using Amazon.SimpleNotificationService;
-using Amazon.SimpleNotificationService.Model;
 using core_banking_lite.Common;
 using core_banking_lite.Entities;
 using core_banking_lite.Interfaces;
 using Microsoft.AspNetCore.Mvc;
-//using Microsoft.Data.SqlClient;
-using Microsoft.Extensions.Options;
-using System.Data;
 
 namespace core_banking_lite.Controllers
 {
@@ -17,17 +10,12 @@ namespace core_banking_lite.Controllers
     public partial class BankAccountController : ControllerBase
     {
         private readonly ILogger<BankAccountController> _logger;
-        private readonly InfrastructureOptions _infraOptions;
-        private readonly AmazonSimpleNotificationServiceClient _snsClient;
         private readonly IBankAccountRepository _repository;
 
-        public BankAccountController(ILogger<BankAccountController> logger, IOptions<InfrastructureOptions> infraOptions, IBankAccountRepository repository)
+        public BankAccountController(ILogger<BankAccountController> logger, IBankAccountRepository repository)
         {
             _logger = logger;
-            _infraOptions = infraOptions.Value ?? throw new ArgumentNullException(nameof(infraOptions));
             _repository = repository;
-
-            _snsClient = new AmazonSimpleNotificationServiceClient(RegionEndpoint.GetBySystemName(_infraOptions.Region));
         }
 
         [HttpGet("getbalance")]
