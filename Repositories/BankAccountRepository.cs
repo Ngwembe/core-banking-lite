@@ -1,10 +1,10 @@
 ﻿using core_banking_lite.Common;
 using core_banking_lite.Entities;
 using core_banking_lite.Interfaces;
+using core_banking_lite.Models.Events;
 using Dapper;
 using Microsoft.Data.SqlClient;
 using System.Data;
-using static core_banking_lite.Controllers.BankAccountController;
 
 namespace core_banking_lite.Repositories
 {
