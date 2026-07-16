@@ -1,7 +1,9 @@
 using Amazon;
 using Amazon.SimpleNotificationService;
+using core_banking_lite.Infrastructure;
 using core_banking_lite.Interfaces;
 using core_banking_lite.Repositories;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -17,12 +19,21 @@ builder.Configuration
 builder.Services.Configure<InfrastructureOptions>(
     builder.Configuration.GetSection(InfrastructureOptions.SectionName));
 
-// Register Dapper repository — resolved connection string at registration time
-builder.Services.AddScoped<IBankAccountRepository>(sp =>
-{
-    var opts = sp.GetRequiredService<IOptions<InfrastructureOptions>>().Value;
-    return new BankAccountRepository(opts.ConnectionStrings.DefaultConnection);
-});
+// Keep one connection open for the lifetime of the app so the named
+// in-memory database is not destroyed between requests.
+const string sqliteConnectionString = "Data Source=banking;Mode=Memory;Cache=Shared";
+
+var keepAlive = new SqliteConnection(sqliteConnectionString);
+keepAlive.Open();
+builder.Services.AddSingleton(keepAlive);
+
+// Initialise schema + seed data before the app starts serving requests.
+var initializer = new SqliteDatabaseInitializer(sqliteConnectionString);
+await initializer.InitializeAsync();
+
+// Register Dapper repository
+builder.Services.AddScoped<IBankAccountRepository>(_ =>
+    new BankAccountRepository(sqliteConnectionString));
 
 // Register SNS client as singleton — it is thread-safe and expensive to construct
 builder.Services.AddSingleton<IAmazonSimpleNotificationService>(sp =>
@@ -31,6 +42,13 @@ builder.Services.AddSingleton<IAmazonSimpleNotificationService>(sp =>
     return new AmazonSimpleNotificationServiceClient(
         RegionEndpoint.GetBySystemName(opts.Region));
 });
+
+builder.Services.AddSingleton<IHostedService>(sp =>
+    new OutboxPublisherService(
+        sqliteConnectionString,
+        sp.GetRequiredService<IOptions<InfrastructureOptions>>(),
+        sp.GetRequiredService<IAmazonSimpleNotificationService>(),
+        sp.GetRequiredService<ILogger<OutboxPublisherService>>()));
 
 builder.Services.AddProblemDetails();
 
@@ -43,3 +61,5 @@ app.UseExceptionHandler();
 app.UseHttpsRedirection();
 app.MapControllers();
 app.Run();
+
+keepAlive.Dispose();

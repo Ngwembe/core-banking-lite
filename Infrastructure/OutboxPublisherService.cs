@@ -2,12 +2,13 @@
 using Amazon.SimpleNotificationService.Model;
 using core_banking_lite.Entities;
 using Dapper;
-using Microsoft.Data.SqlClient;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Options;
 
 namespace core_banking_lite.Infrastructure
 {
     public sealed class OutboxPublisherService(
+    string connectionString,
     IOptions<InfrastructureOptions> infraOptions,
     IAmazonSimpleNotificationService snsClient,
     ILogger<OutboxPublisherService> logger) : BackgroundService
@@ -17,16 +18,17 @@ namespace core_banking_lite.Infrastructure
 
         // Constant SQL — never interpolated
         private const string FetchUnprocessedSql = """
-        SELECT TOP 10 id, event_type AS EventType, payload, created_at AS CreatedAt, processed
+        SELECT id, event_type AS EventType, payload, created_at AS CreatedAt, processed
         FROM   outbox_messages
         WHERE  processed = 0
         ORDER  BY created_at ASC
+        LIMIT  10
         """;
 
         private const string MarkProcessedSql = """
         UPDATE outbox_messages
         SET    processed    = 1,
-               processed_at = GETUTCDATE()
+               processed_at = datetime('now')
         WHERE  id = @id
         """;
 
@@ -49,7 +51,7 @@ namespace core_banking_lite.Infrastructure
 
         private async Task PublishPendingMessagesAsync(CancellationToken ct)
         {
-            await using var conn = new SqlConnection(_opts.ConnectionStrings.DefaultConnection);
+            await using var conn = new SqliteConnection(connectionString);
             await conn.OpenAsync(ct);
 
             var messages = (await conn.QueryAsync<OutboxMessage>(

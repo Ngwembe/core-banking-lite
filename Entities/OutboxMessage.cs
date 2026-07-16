@@ -2,7 +2,7 @@
 {
     public sealed record OutboxMessage
     {
-        public Guid Id { get; init; } = Guid.NewGuid();
+        public string Id { get; init; } = Guid.NewGuid().ToString();
         public string EventType { get; init; } = string.Empty;
         public string Payload { get; init; } = string.Empty;
         public DateTime CreatedAt { get; init; } = DateTime.UtcNow;

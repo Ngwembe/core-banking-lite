@@ -3,14 +3,14 @@ using core_banking_lite.Entities;
 using core_banking_lite.Interfaces;
 using core_banking_lite.Models.Events;
 using Dapper;
-using Microsoft.Data.SqlClient;
+using Microsoft.Data.Sqlite;
 using System.Data;
 
 namespace core_banking_lite.Repositories
 {
     public sealed class BankAccountRepository(string connectionString) : IBankAccountRepository
     {
-        private IDbConnection CreateConnection() => new SqlConnection(connectionString);
+        private IDbConnection CreateConnection() => new SqliteConnection(connectionString);
 
         public async Task<decimal?> GetBalanceAsync(long accountId, CancellationToken ct = default)
         {
@@ -33,7 +33,7 @@ namespace core_banking_lite.Repositories
             const string sql = """
             UPDATE accounts
             SET    balance    = balance - @amount,
-                   updated_at = GETUTCDATE()
+                   updated_at = datetime('now')
             WHERE  id         = @accountId
             AND    balance    >= @amount
             AND    is_active   = 1
@@ -49,7 +49,7 @@ namespace core_banking_lite.Repositories
         private const string DeductBalanceSql = """
         UPDATE accounts
         SET    balance    = balance - @amount,
-               updated_at = GETUTCDATE()
+               updated_at = datetime('now')
         WHERE  id         = @accountId
         AND    balance    >= @amount
         AND    is_active   = 1
@@ -62,7 +62,7 @@ namespace core_banking_lite.Repositories
 
         public async Task<Result<WithdrawalRecord>> DeductBalanceAndEnqueueEventAsync(long accountId, decimal amount, CancellationToken ct = default)
         {
-            await using var conn = new SqlConnection(connectionString);
+            await using var conn = new SqliteConnection(connectionString);
             await conn.OpenAsync(ct);
             await using var tx = await conn.BeginTransactionAsync(ct);
 
@@ -87,10 +87,10 @@ namespace core_banking_lite.Repositories
                 // If this insert fails, the withdrawal rolls back too — no phantom events.
                 var outboxMessage = new
                 {
-                    id = Guid.NewGuid(),
+                    id = Guid.NewGuid().ToString(),
                     eventType = "WithdrawalEvent",
                     payload = new WithdrawalEvent(amount, accountId, "SUCCESSFUL").ToJson(),
-                    createdAt = DateTime.UtcNow
+                    createdAt = DateTime.UtcNow.ToString("o")
                 };
 
                 await conn.ExecuteAsync(
