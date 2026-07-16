@@ -106,9 +106,6 @@ namespace core_banking_lite.Repositories
                         "INACTIVE" => Result<WithdrawalRecord>.Fail($"Account {accountId} is inactive."),
                         _ => Result<WithdrawalRecord>.Fail("Insufficient funds.")
                     };
-
-                    //await tx.RollbackAsync(ct);
-                    //return Result<WithdrawalRecord>.Fail("Insufficient funds or account not found.");
                 }
 
                 // Step 2 — Write outbox message in the SAME transaction.

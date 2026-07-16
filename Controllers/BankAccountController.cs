@@ -47,9 +47,7 @@ namespace core_banking_lite.Controllers
                     onFailure: error =>
                     {
                         _logger.LogWarning("Withdrawal rejected: {Error}", error);
-                        return error.Contains("not found") || error.Contains("funds")
-                            ? UnprocessableEntity(new { error })
-                            : BadRequest(new { error });
+                        return error.Contains("not found") ? UnprocessableEntity(new { error }) : BadRequest(new { error });
                     });
         }
 
