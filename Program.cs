@@ -19,21 +19,14 @@ builder.Configuration
 builder.Services.Configure<InfrastructureOptions>(
     builder.Configuration.GetSection(InfrastructureOptions.SectionName));
 
-// Keep one connection open for the lifetime of the app so the named
-// in-memory database is not destroyed between requests.
-const string sqliteConnectionString = "Data Source=banking;Mode=Memory;Cache=Shared";
+// ── Persistence ──────────────────────────────────────────────────────────────
+// Swap this one call to change the entire data layer (e.g. AddEfCorePersistence).
+const string connectionString = "Data Source=banking;Mode=Memory;Cache=Shared";
+builder.Services.AddSqlitePersistence(connectionString);
 
-var keepAlive = new SqliteConnection(sqliteConnectionString);
-keepAlive.Open();
-builder.Services.AddSingleton(keepAlive);
-
-// Initialise schema + seed data before the app starts serving requests.
-var initializer = new SqliteDatabaseInitializer(sqliteConnectionString);
+var initializer = new SqliteDatabaseInitializer(connectionString);
 await initializer.InitializeAsync();
-
-// Register Dapper repository
-builder.Services.AddScoped<IBankAccountRepository>(_ =>
-    new BankAccountRepository(sqliteConnectionString));
+// ─────────────────────────────────────────────────────────────────────────────
 
 // Register SNS client as singleton — it is thread-safe and expensive to construct
 builder.Services.AddSingleton<IAmazonSimpleNotificationService>(sp =>
@@ -49,12 +42,7 @@ if (builder.Environment.IsDevelopment())
 else
     builder.Services.AddSingleton<ISnsPublisher, SnsPublisher>();
 
-builder.Services.AddSingleton<IHostedService>(sp =>
-    new OutboxPublisherService(
-        sqliteConnectionString,
-        sp.GetRequiredService<IOptions<InfrastructureOptions>>(),
-        sp.GetRequiredService<ISnsPublisher>(),
-        sp.GetRequiredService<ILogger<OutboxPublisherService>>()));
+builder.Services.AddHostedService<OutboxPublisherService>();
 
 builder.Services.AddProblemDetails();
 
@@ -67,5 +55,3 @@ app.UseExceptionHandler();
 app.UseHttpsRedirection();
 app.MapControllers();
 app.Run();
-
-keepAlive.Dispose();

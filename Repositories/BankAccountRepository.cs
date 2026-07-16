@@ -26,26 +26,6 @@ namespace core_banking_lite.Repositories
                 new CommandDefinition(sql, new { accountId }, cancellationToken: ct));
         }
 
-        public async Task<bool> DeductBalanceAsync(long accountId, decimal amount, CancellationToken ct = default)
-        {
-            // Single atomic statement — no race condition possible.
-            // The WHERE clause acts as both the existence check and the balance guard.
-            const string sql = """
-            UPDATE accounts
-            SET    balance    = balance - @amount,
-                   updated_at = datetime('now')
-            WHERE  id         = @accountId
-            AND    balance    >= @amount
-            AND    is_active   = 1
-            """;
-
-            using var conn = CreateConnection();
-            int rows = await conn.ExecuteAsync(
-                new CommandDefinition(sql, new { accountId, amount }, cancellationToken: ct));
-
-            return rows > 0;
-        }
-
         private const string DeductBalanceSql = """
         UPDATE accounts
         SET    balance    = balance - @amount,
