@@ -1,0 +1,6 @@
+@core_banking_lite_HostAddress = http://localhost:5125
+
+GET {{core_banking_lite_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
