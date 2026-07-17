@@ -1,4 +1,4 @@
-# core-banking-lite — Refactoring Analysis
+# Refactoring Analysis
 
 ## Overview
 
