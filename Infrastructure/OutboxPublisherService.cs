@@ -1,5 +1,6 @@
 ﻿using core_banking_lite.Entities;
 using core_banking_lite.Interfaces;
+using core_banking_lite.Models.Configs;
 using Dapper;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Options;

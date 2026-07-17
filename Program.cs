@@ -2,6 +2,7 @@ using Amazon;
 using Amazon.SimpleNotificationService;
 using core_banking_lite.Infrastructure;
 using core_banking_lite.Interfaces;
+using core_banking_lite.Models.Configs;
 using core_banking_lite.Repositories;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Options;
