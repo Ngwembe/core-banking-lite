@@ -1,6 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
-
-namespace core_banking_lite.Common
+﻿namespace core_banking_lite.Common
 {
     public sealed class Result<T>
     {
@@ -21,26 +19,21 @@ namespace core_banking_lite.Common
             => IsSuccess ? await next(Value!) : Result<TNext>.Fail(Error!);
 
         /// <summary>
-        /// Terminal bind — maps a successful result to an IActionResult.
+        /// Maps the result to any output type — no framework dependency.
         /// </summary>
-        public IActionResult Match(
-            Func<T, IActionResult> onSuccess,
-            Func<string, IActionResult> onFailure)
+        public TOut Match<TOut>(Func<T, TOut> onSuccess, Func<string, TOut> onFailure)
             => IsSuccess ? onSuccess(Value!) : onFailure(Error!);
     }
 
     /// <summary>
-    /// Extension methods on Task&lt;Result&lt;T&gt;&gt; that enable fluent railway chaining
-    /// directly on async-returning methods without intermediate awaits.
+    /// Framework-agnostic async chaining extensions on Task&lt;Result&lt;T&gt;&gt;.
+    /// HTTP-specific overloads live in Controllers\ResultExtensions.cs.
     /// </summary>
     public static class ResultTaskExtensions
     {
         /// <summary>
         /// Awaits the task, then binds the resolved Result into the next async step.
         /// Short-circuits on failure — next is never invoked if the result has an error.
-        /// This is what makes the chain in the controller compile:
-        ///   ValidateInput(...)          → Task&lt;Result&lt;T&gt;&gt;
-        ///     .BindAsync(...)           → Task&lt;Result&lt;TNext&gt;&gt;
         /// </summary>
         public static async Task<Result<TNext>> BindAsync<T, TNext>(
             this Task<Result<T>> resultTask,
@@ -53,20 +46,19 @@ namespace core_banking_lite.Common
         }
 
         /// <summary>
-        /// Awaits the task, then executes Match on the resolved Result.
-        /// Allows the entire railway expression to terminate in a single fluent call.
+        /// Awaits the task, then maps the resolved Result to any output type.
         /// </summary>
-        public static async Task<IActionResult> MatchAsync<T>(
+        public static async Task<TOut> MatchAsync<T, TOut>(
             this Task<Result<T>> resultTask,
-            Func<T, IActionResult> onSuccess,
-            Func<string, IActionResult> onFailure)
+            Func<T, TOut> onSuccess,
+            Func<string, TOut> onFailure)
         {
             Result<T> result = await resultTask;
             return result.Match(onSuccess, onFailure);
         }
     }
 
-    /// <summary>Represents a void result in the railway chain.</summary>
+    /// <summary>Represents a void success value in the railway chain.</summary>
     public sealed record Unit
     {
         public static readonly Unit Value = new();

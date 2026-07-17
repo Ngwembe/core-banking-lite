@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace core_banking_lite.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/bank")]
     public partial class BankAccountController : ControllerBase
     {
         private readonly ILogger<BankAccountController> _logger;
@@ -31,9 +31,9 @@ namespace core_banking_lite.Controllers
 
         [HttpPost("withdraw")]
         public async Task<IActionResult> Withdraw(
-        [FromQuery] long accountId,
-        [FromQuery] decimal amount,
-        CancellationToken cancellationToken)
+            [FromQuery] long accountId,
+            [FromQuery] decimal amount,
+            CancellationToken cancellationToken)
         {
             return await ValidateInput(accountId, amount)
                 .BindAsync(input => ProcessWithdrawalAsync(input.AccountId, input.Amount, cancellationToken))
@@ -42,12 +42,14 @@ namespace core_banking_lite.Controllers
                     {
                         _logger.LogInformation(
                             "Withdrawal of {Amount} completed for account {AccountId}.", record.Amount, record.AccountId);
-                        return Ok(new { message = "Withdrawal successful.", record.AccountId, record.Amount });
+                        return (IActionResult)Ok(new { message = "Withdrawal successful.", record.AccountId, record.Amount });
                     },
                     onFailure: error =>
                     {
                         _logger.LogWarning("Withdrawal rejected: {Error}", error);
-                        return error.Contains("not found") ? UnprocessableEntity(new { error }) : BadRequest(new { error });
+                        return error.Contains("not found")
+                            ? (IActionResult)UnprocessableEntity(new { error })
+                            : BadRequest(new { error });
                     });
         }
 

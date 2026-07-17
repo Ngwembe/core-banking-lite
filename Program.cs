@@ -16,17 +16,19 @@ builder.Configuration
     .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true)
     .AddEnvironmentVariables();
 
-builder.Services.Configure<InfrastructureOptions>(
-    builder.Configuration.GetSection(InfrastructureOptions.SectionName));
+// Ensures misconfigured deployments fail fast and visibly instead of silently at runtime.
+builder.Services.AddOptions<InfrastructureOptions>()
+    .BindConfiguration(InfrastructureOptions.SectionName)
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
 
-// ── Persistence ──────────────────────────────────────────────────────────────
+// Persistence
 // Swap this one call to change the entire data layer (e.g. AddEfCorePersistence).
 const string connectionString = "Data Source=banking;Mode=Memory;Cache=Shared";
 builder.Services.AddSqlitePersistence(connectionString);
 
 var initializer = new SqliteDatabaseInitializer(connectionString);
 await initializer.InitializeAsync();
-// ─────────────────────────────────────────────────────────────────────────────
 
 // Register SNS client as singleton — it is thread-safe and expensive to construct
 builder.Services.AddSingleton<IAmazonSimpleNotificationService>(sp =>
