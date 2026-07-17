@@ -22,7 +22,7 @@ namespace core_banking_lite.Infrastructure
 
             // Register Dapper repository
             services.AddScoped<IBankAccountRepository>(_ =>
-                new BankAccountRepository(connectionString));
+                new SqliteBankAccountRepository(connectionString));
 
             services.AddSingleton<IOutboxRepository>(_ =>
                 new SqliteOutboxRepository(connectionString));

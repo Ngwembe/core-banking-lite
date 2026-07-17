@@ -8,40 +8,44 @@ using System.Data;
 
 namespace core_banking_lite.Repositories
 {
-    public sealed class BankAccountRepository(string connectionString) : IBankAccountRepository
+    public sealed class SqliteBankAccountRepository(string connectionString) : IBankAccountRepository
     {
         private IDbConnection CreateConnection() => new SqliteConnection(connectionString);
 
         public async Task<decimal?> GetBalanceAsync(long accountId, CancellationToken ct = default)
         {
             const string sql = """
-            SELECT balance
+            SELECT balance_minor
             FROM   accounts
             WHERE  id        = @accountId
             AND    is_active  = 1
             """;
 
             using var conn = CreateConnection();
-            return await conn.ExecuteScalarAsync<decimal?>(
+
+            // Dapper maps the INTEGER column to long — convert at the exit boundary.
+            long? minor = await conn.ExecuteScalarAsync<long?>(
                 new CommandDefinition(sql, new { accountId }, cancellationToken: ct));
+
+            return minor is null ? null : MoneyConverter.FromMinorUnits(minor.Value);
         }
 
+        // balance_minor arithmetic is exact INTEGER — no floating-point involved.
         private const string DeductBalanceSql = """
         UPDATE accounts
-        SET    balance    = balance - @amount,
+        SET    balance_minor = balance_minor - @amountMinor,
                updated_at = datetime('now')
-        WHERE  id         = @accountId
-        AND    balance    >= @amount
-        AND    is_active   = 1
+        WHERE  id = @accountId
+        AND    balance_minor >= @amountMinor
+        AND    is_active = 1
         """;
 
         // Diagnostic — only executed when the UPDATE returns 0 rows.
         private const string DiagnoseFailureSql = """
         SELECT CASE
-                   WHEN NOT EXISTS (SELECT 1 FROM accounts WHERE id = @accountId)           THEN 'NOT_FOUND'
-                   WHEN EXISTS     (SELECT 1 FROM accounts WHERE id = @accountId
-                                    AND is_active = 0)                                      THEN 'INACTIVE'
-                   ELSE                                                                          'INSUFFICIENT_FUNDS'
+                   WHEN NOT EXISTS (SELECT 1 FROM accounts WHERE id = @accountId) THEN 'NOT_FOUND'
+                   WHEN EXISTS     (SELECT 1 FROM accounts WHERE id = @accountId AND is_active = 0) THEN 'INACTIVE'
+                   ELSE 'INSUFFICIENT_FUNDS'
                END AS reason
         """;
 
@@ -52,18 +56,20 @@ namespace core_banking_lite.Repositories
 
         public async Task<Result<WithdrawalRecord>> DeductBalanceAndEnqueueEventAsync(long accountId, decimal amount, CancellationToken ct = default)
         {
+            // Convert at the entry boundary — all SQL sees only the exact integer.
+            long amountMinor = MoneyConverter.ToMinorUnits(amount);
+
             await using var conn = new SqliteConnection(connectionString);
             await conn.OpenAsync(ct);
             await using var tx = await conn.BeginTransactionAsync(ct);
 
             try
             {
-                // Step 1 — Atomic deduction: guard + update in one statement.
                 // If balance < amount or account doesn't exist: rows == 0.
                 int rows = await conn.ExecuteAsync(
                     new CommandDefinition(
                         DeductBalanceSql,
-                        new { accountId, amount },   // always parameterized by Dapper
+                        new { accountId, amountMinor },
                         transaction: tx,
                         cancellationToken: ct));
 
@@ -88,7 +94,6 @@ namespace core_banking_lite.Repositories
                     };
                 }
 
-                // Step 2 — Write outbox message in the SAME transaction.
                 // If this insert fails, the withdrawal rolls back too — no phantom events.
                 var outboxMessage = new
                 {
@@ -101,14 +106,13 @@ namespace core_banking_lite.Repositories
                 await conn.ExecuteAsync(
                     new CommandDefinition(
                         InsertOutboxSql,
-                        outboxMessage,              // always parameterized by Dapper
+                        outboxMessage,
                         transaction: tx,
                         cancellationToken: ct));
 
                 await tx.CommitAsync(ct);
 
-                return Result<WithdrawalRecord>.Ok(
-                    new WithdrawalRecord(accountId, amount, DateTime.UtcNow));
+                return Result<WithdrawalRecord>.Ok(new WithdrawalRecord(accountId, amount, DateTime.UtcNow));
             }
             catch
             {
