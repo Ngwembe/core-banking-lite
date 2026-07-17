@@ -219,3 +219,65 @@ All configuration is accessed via `IOptions<InfrastructureOptions>` — no raw `
 | 1 | No unit or integration tests despite full testability infrastructure | High | Out of scope |
 | 2 | `WithdrawalEvent.ToJson()` — serialization logic on the model violates SRP | Low | Move serialization logic to a dedicated service |
 | 3 | Failure reasons are still `string` — controller maps HTTP status via substring match; a typed `enum` would be safer | Low | Could consider introducing a typed `enum` for failure reasons |
+
+---
+
+## 12. Technology Stack
+
+| # | Technology | Reason |
+|---|---|---|
+| 1 | .NET 10.0 | Latest LTS version with new features |
+| 2 | Dapper | It is a lightweight ORM for .NET and provides a simple way to map database records to .NET objects without the need for complex configuration. |
+| 3 | SQLite | It is a lightweight, serverless, self-contained SQL database engine that is easy to set up and use for small-scale applications. |
+
+---
+
+## 13. How to run the application locally:
+
+Follow these instructions to get a copy of the project up and running on your local machine.
+
+### Prerequisites
+
+You need the following tools installed on your machine:
+
+* **.NET SDK** (version 10.0) - [Download .NET](https://microsoft.com)
+* **IDE/Editor** - Visual Studio 2022, JetBrains Rider, or VS Code
+* **Git** - To clone the repository
+
+### Local Setup
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/Ngwembe/core-banking-lite.git
+   cd core-banking-lite
+   ```
+
+2. **Restore dependencies**
+   ```bash
+   dotnet restore
+   ```
+
+3. **Build the application**
+   ```bash
+   dotnet build
+   ```
+
+### Running the Application
+
+You can run the project using the .NET CLI or your preferred IDE.
+
+#### Option 1: Using the .NET CLI (Recommended)
+
+Navigate to the project directory containing the `.csproj` file and run:
+
+```bash
+dotnet run
+```
+
+* For web APIs/Apps: Open `http://localhost:5125` (or the port specified in your console output) in your browser.
+
+#### Option 2: Using Visual Studio / Rider
+
+1. Open the `.sln` (Solution) file in your IDE.
+2. Set the startup project (e.g., the Web API or Console project).
+3. Press **F5** or click the **Play** button to run with debugging.
