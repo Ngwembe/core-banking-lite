@@ -60,7 +60,7 @@ namespace core_banking_lite.Infrastructure
             {
                 try
                 {
-                    await snsPublisher.PublishAsync(_opts.SnsTopicArn, message.Payload, ct);
+                    await snsPublisher.PublishAsync(_opts.SnsTopicArn, message.Payload, message.IdempotencyKey, ct);
                     await outboxRepository.MarkProcessedAsync(message.Id, ct);
 
                     logger.LogInformation("Outbox message {Id} ({EventType}) published to SNS.", message.Id, message.EventType);
@@ -69,10 +69,12 @@ namespace core_banking_lite.Infrastructure
                 }
                 catch (OperationCanceledException)
                 {
+                    await outboxRepository.IncrementRetryCountAsync(message.Id, ct);
                     throw; // Propagate shutdown signal immediately.
                 }
                 catch (Exception ex)
                 {
+                    await outboxRepository.IncrementRetryCountAsync(message.Id, ct);
                     logger.LogError(ex, "Failed to publish outbox message {Id} — will retry on next cycle.", message.Id);
                 }
             }

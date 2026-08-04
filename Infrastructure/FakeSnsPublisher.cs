@@ -4,7 +4,7 @@ namespace core_banking_lite.Infrastructure
 {
     public sealed class FakeSnsPublisher(ILogger<FakeSnsPublisher> logger) : ISnsPublisher
     {
-        public Task PublishAsync(string topicArn, string message, CancellationToken ct = default)
+        public Task PublishAsync(string topicArn, string message, string idempotencyKey, CancellationToken ct = default)
         {
             logger.LogInformation(
                 "[FakeSnsPublisher] Simulated SNS publish to {TopicArn}: {Message}", topicArn, message);

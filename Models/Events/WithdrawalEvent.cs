@@ -4,15 +4,18 @@ namespace core_banking_lite.Models.Events
 {
     public class WithdrawalEvent
     {
+        public string IdempotencyKey { get; }
+
         public decimal Amount { get; }
         public long AccountId { get; }
         public string Status { get; }
 
-        public WithdrawalEvent(decimal amount, long accountId, string status)
+        public WithdrawalEvent(decimal amount, long accountId, string status, string idempotencyKey)
         {
             Amount = amount;
             AccountId = accountId;
             Status = status;
+            IdempotencyKey = idempotencyKey;
         }
 
         // Convert to JSON String
@@ -22,7 +25,11 @@ namespace core_banking_lite.Models.Events
             {
                 amount = Amount,
                 accountId = AccountId,
-                status = Status
+                status = Status,
+                idempotencyKey = IdempotencyKey
+            }, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
             });
         }
     }

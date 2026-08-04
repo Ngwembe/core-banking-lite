@@ -23,7 +23,10 @@ namespace core_banking_lite.Infrastructure
                     id TEXT PRIMARY KEY,
                     event_type TEXT NOT NULL,
                     payload TEXT NOT NULL,
+                    idempotencyKey TEXT NOT NULL,
+                    retry_count INTEGER NOT NULL DEFAULT 0,
                     created_at TEXT NOT NULL,
+                    last_modified_at TEXT NOT NULL,
                     processed_at TEXT NULL,
                     processed INTEGER NOT NULL DEFAULT 0
                 );

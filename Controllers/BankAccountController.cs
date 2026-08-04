@@ -1,6 +1,7 @@
 using core_banking_lite.Common;
 using core_banking_lite.Entities;
 using core_banking_lite.Interfaces;
+using core_banking_lite.Models;
 using Microsoft.AspNetCore.Mvc;
 
 namespace core_banking_lite.Controllers
@@ -31,11 +32,10 @@ namespace core_banking_lite.Controllers
 
         [HttpPost("withdraw")]
         public async Task<IActionResult> Withdraw(
-            [FromQuery] long accountId,
-            [FromQuery] decimal amount,
+            [FromBody] WithdrawRequest request,
             CancellationToken cancellationToken)
         {
-            return await ValidateInput(accountId, amount)
+            return await ValidateInput(request)
                 .BindAsync(input => ProcessWithdrawalAsync(input.AccountId, input.Amount, cancellationToken))
                 .MatchAsync(
                     onSuccess: record =>
@@ -53,15 +53,15 @@ namespace core_banking_lite.Controllers
                     });
         }
 
-        private static Task<Result<(long AccountId, decimal Amount)>> ValidateInput(long accountId, decimal amount)
+        private static Task<Result<(long AccountId, decimal Amount)>> ValidateInput(WithdrawRequest request)
         {
-            if (accountId <= 0)
+            if (request.AccountId <= 0)
                 return Task.FromResult(Result<(long, decimal)>.Fail("Account ID must be positive."));
 
-            if (amount <= 0)
+            if (request.Amount <= 0)
                 return Task.FromResult(Result<(long, decimal)>.Fail("Withdrawal amount must be greater than zero."));
 
-            return Task.FromResult(Result<(long, decimal)>.Ok((accountId, amount)));
+            return Task.FromResult(Result<(long, decimal)>.Ok((request.AccountId, request.Amount)));
         }
 
         private Task<Result<WithdrawalRecord>> ProcessWithdrawalAsync(long accountId, decimal amount, CancellationToken ct)

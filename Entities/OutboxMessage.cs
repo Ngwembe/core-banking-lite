@@ -5,6 +5,7 @@
         public string Id { get; init; } = Guid.NewGuid().ToString();
         public string EventType { get; init; } = string.Empty;
         public string Payload { get; init; } = string.Empty;
+        public string IdempotencyKey { get; init; } = string.Empty;
         public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
         public bool Processed { get; init; }
     }

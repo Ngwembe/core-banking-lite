@@ -50,8 +50,8 @@ namespace core_banking_lite.Repositories
         """;
 
         private const string InsertOutboxSql = """
-        INSERT INTO outbox_messages (id, event_type, payload, created_at, processed)
-        VALUES (@id, @eventType, @payload, @createdAt, 0)
+        INSERT INTO outbox_messages (id, event_type, payload, idempotencyKey, created_at, last_modified_at, processed)
+        VALUES (@id, @eventType, @payload, @idempotencyKey, @createdAt, @lastModifiedAt, 0)
         """;
 
         public async Task<Result<WithdrawalRecord>> DeductBalanceAndEnqueueEventAsync(long accountId, decimal amount, CancellationToken ct = default)
@@ -94,13 +94,17 @@ namespace core_banking_lite.Repositories
                     };
                 }
 
+                string idempotencyKey = Guid.NewGuid().ToString();
+
                 // If this insert fails, the withdrawal rolls back too — no phantom events.
                 var outboxMessage = new
                 {
                     id = Guid.NewGuid().ToString(),
                     eventType = "WithdrawalEvent",
-                    payload = new WithdrawalEvent(amount, accountId, "SUCCESSFUL").ToJson(),
-                    createdAt = DateTime.UtcNow.ToString("o")
+                    payload = new WithdrawalEvent(amount, accountId, "SUCCESSFUL", idempotencyKey).ToJson(),
+                    idempotencyKey,
+                    createdAt = DateTime.UtcNow.ToString("o"),
+                    lastModifiedAt = DateTime.UtcNow.ToString("o")
                 };
 
                 await conn.ExecuteAsync(
