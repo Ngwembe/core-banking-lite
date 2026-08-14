@@ -46,6 +46,7 @@ else
     builder.Services.AddSingleton<ISnsPublisher, SnsPublisher>();
 
 builder.Services.AddHostedService<OutboxPublisherService>();
+builder.Services.AddHostedService<OutboxReversalService>();
 
 builder.Services.AddProblemDetails();
 

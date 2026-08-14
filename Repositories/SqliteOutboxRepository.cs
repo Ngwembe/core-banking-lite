@@ -8,9 +8,29 @@ namespace core_banking_lite.Repositories
     public sealed class SqliteOutboxRepository(string connectionString) : IOutboxRepository
     {
         private const string FetchUnprocessedSql = """
-        SELECT id, event_type AS EventType, payload, created_at AS CreatedAt, processed
+        SELECT id,
+               event_type AS EventType,
+               payload,
+               idempotencyKey AS IdempotencyKey,
+               created_at AS CreatedAt,
+               processed
+        FROM   outbox_messages
+        WHERE  processed = 0 AND retry_count < 5 AND last_modified_at <= datetime('now', '-2 minute')
+        ORDER  BY created_at ASC
+        LIMIT  @batchSize
+        """;
+       
+        private const string FetchUnsentMessagesSql = """
+        SELECT id,
+               event_type AS EventType,
+               payload,
+               idempotencyKey AS IdempotencyKey,
+               created_at AS CreatedAt,
+               processed
         FROM   outbox_messages
         WHERE  processed = 0
+        AND    retry_count >= 5
+        AND    event_type = 'WithdrawalEvent'
         ORDER  BY created_at ASC
         LIMIT  @batchSize
         """;
@@ -30,6 +50,18 @@ namespace core_banking_lite.Repositories
 
             var results = await conn.QueryAsync<OutboxMessage>(
                 new CommandDefinition(FetchUnprocessedSql, new { batchSize }, cancellationToken: ct));
+
+            return results.AsList();
+        }
+        
+        public async Task<IReadOnlyList<OutboxMessage>> FetchUnsentMessagesAsync(
+            int batchSize, CancellationToken ct = default)
+        {
+            await using var conn = new SqliteConnection(connectionString);
+            await conn.OpenAsync(ct);
+
+            var results = await conn.QueryAsync<OutboxMessage>(
+                new CommandDefinition(FetchUnsentMessagesSql, new { batchSize }, cancellationToken: ct));
 
             return results.AsList();
         }

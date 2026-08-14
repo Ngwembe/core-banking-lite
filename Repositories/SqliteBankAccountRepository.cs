@@ -40,6 +40,15 @@ namespace core_banking_lite.Repositories
         AND    is_active = 1
         """;
 
+        // balance_minor arithmetic is exact INTEGER — no floating-point involved.
+        private const string CreditBalanceSql = """
+        UPDATE accounts
+        SET    balance_minor = balance_minor + @amountMinor,
+               updated_at = datetime('now')
+        WHERE  id = @accountId
+        AND    is_active = 1
+        """;
+
         // Diagnostic — only executed when the UPDATE returns 0 rows.
         private const string DiagnoseFailureSql = """
         SELECT CASE
@@ -113,6 +122,53 @@ namespace core_banking_lite.Repositories
                 await tx.CommitAsync(ct);
 
                 return Result<WithdrawalRecord>.Ok(new WithdrawalRecord(accountId, amount, DateTime.UtcNow));
+            }
+            catch
+            {
+                await tx.RollbackAsync(ct);
+                throw;
+            }
+        }
+
+        public async Task<Result<bool>> CreditBalanceAndEnqueueEventAsync(long accountId, decimal amount, CancellationToken ct = default)
+        {
+            // Convert at the entry boundary — all SQL sees only the exact integer.
+            long amountMinor = MoneyConverter.ToMinorUnits(amount);
+
+            await using var conn = new SqliteConnection(connectionString);
+            await conn.OpenAsync(ct);
+            await using var tx = await conn.BeginTransactionAsync(ct);
+
+            try
+            {
+                int rows = await conn.ExecuteAsync(
+                    new CommandDefinition(
+                        CreditBalanceSql,
+                        new { accountId, amountMinor },
+                        transaction: tx,
+                        cancellationToken: ct));
+
+                if (rows == 0)
+                {
+                    string reason = await conn.ExecuteScalarAsync<string>(
+                        new CommandDefinition(
+                            DiagnoseFailureSql,
+                            new { accountId },
+                            transaction: tx,
+                            cancellationToken: ct)) ?? "INACTIVE";
+
+                    await tx.RollbackAsync(ct);
+
+                    return reason switch
+                    {
+                        "NOT_FOUND" => Result<bool>.Fail($"Account {accountId} not found."),
+                        "INACTIVE" => Result<bool>.Fail($"Account {accountId} is inactive."),
+                        _ => Result<bool>.Fail("Unable to credit account.")
+                    };
+                }
+
+                await tx.CommitAsync(ct);
+                return Result<bool>.Ok(true);
             }
             catch
             {
