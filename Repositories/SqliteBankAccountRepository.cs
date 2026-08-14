@@ -130,7 +130,7 @@ namespace core_banking_lite.Repositories
             }
         }
 
-        public async Task<Result<bool>> CreditBalanceAndEnqueueEventAsync(long accountId, decimal amount, CancellationToken ct = default)
+        public async Task<Result<bool>> EnqueuedEventBalanceCreditAsync(long accountId, decimal amount, CancellationToken ct = default)
         {
             // Convert at the entry boundary — all SQL sees only the exact integer.
             long amountMinor = MoneyConverter.ToMinorUnits(amount);

@@ -12,6 +12,6 @@ namespace core_banking_lite.Interfaces
         /// in a single database transaction.
         /// </summary>
         Task<Result<WithdrawalRecord>> DeductBalanceAndEnqueueEventAsync(long accountId, decimal amount, CancellationToken ct = default);
-        Task<Result<bool>> CreditBalanceAndEnqueueEventAsync(long accountId, decimal amount, CancellationToken ct = default);
+        Task<Result<bool>> EnqueuedEventBalanceCreditAsync(long accountId, decimal amount, CancellationToken ct = default);
     }
 }
